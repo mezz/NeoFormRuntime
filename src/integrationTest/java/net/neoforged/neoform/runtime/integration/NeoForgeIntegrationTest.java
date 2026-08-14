@@ -14,7 +14,7 @@ import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_JAR_WITH_SOURCES_
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_SOURCES_WITH_NEOFORGE;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class NeoForgeSourceResultIntegrationTest {
+class NeoForgeIntegrationTest {
     @Test
     void routesTransformedSourcesAndCompiledClassesToNeoForgeResults(@TempDir Path tempDir) throws Exception {
         var neoForm = NeoFormFixture.builder()
@@ -92,5 +92,95 @@ class NeoForgeSourceResultIntegrationTest {
             assertThat(Modifier.isPublic(gameClass.getDeclaredField("neoForgeTransformed").getModifiers())).isTrue();
             assertThat(Modifier.isPublic(gameClass.getDeclaredField("userTransformed").getModifiers())).isTrue();
         }
+    }
+
+    @Test
+    void appliesSourcePatchesWithConfiguredPrefixes(@TempDir Path tempDir) throws Exception {
+        var neoForm = NeoFormFixture.builder()
+                .source("example/Example.java", """
+                        package example;
+
+                        public class Example {
+                            private int first;
+                            private int second;
+                        }
+                        """)
+                .build();
+        var fixture = NeoForgeFixture.builder(neoForm)
+                .patchPrefixes("original/", "modified/")
+                .patch("example/Example.java.patch", """
+                        --- original/example/Example.java
+                        +++ modified/example/Example.java
+                        @@ -3,4 +3,8 @@
+                         public class Example {
+                             private int first;
+                             private int second;
+                        +    public String patched() {
+                        +        return "yes";
+                        +    }
+                         }
+                        """)
+                .build();
+        var command = NfrtCommand.builder(tempDir, fixture)
+                .result(GAME_SOURCES_WITH_NEOFORGE)
+                .build();
+
+        command.executeSuccessfully();
+
+        assertThat(command.readResult(GAME_SOURCES_WITH_NEOFORGE, "example/Example.java"))
+                .isEqualTo("""
+                        package example;
+
+                        public class Example {
+                            private int first;
+                            private int second;
+                            public String patched() {
+                                return "yes";
+                            }
+                        }
+                        """);
+    }
+
+    @Test
+    void appliesConfiguredLegacySideAnnotationStrippers(@TempDir Path tempDir) throws Exception {
+        var neoForm = NeoFormFixture.builder()
+                .minecraftVersion("1.20.1")
+                .source("Example.java", """
+                        @Deprecated
+                        class Example {
+                        }
+                        """)
+                .compileLauncherSources()
+                .legacyMappings(LegacyMappings.builder()
+                        .classMapping("Example", "Example", "Example")
+                        .build())
+                .build();
+        var fixture = NeoForgeFixture.builder(neoForm)
+                .sideAnnotationStripper("Example\n")
+                .patch("Example.java.patch", """
+                        --- a/Example.java
+                        +++ b/Example.java
+                        @@ -1,3 +1,4 @@
+                         @Deprecated
+                         class Example {
+                        +    int value;
+                         }
+                        """)
+                .build();
+        var command = NfrtCommand.builder(tempDir, fixture)
+                .result(GAME_SOURCES_WITH_NEOFORGE)
+                .build();
+
+        var output = command.executeSuccessfully();
+
+        assertThat(output)
+                .contains("*** Started working on stripSideAnnotations");
+        assertThat(command.readResult(GAME_SOURCES_WITH_NEOFORGE, "Example.java"))
+                .isEqualTo("""
+                        @Deprecated
+                        class Example {
+                            int value;
+                        }
+                        """);
     }
 }
