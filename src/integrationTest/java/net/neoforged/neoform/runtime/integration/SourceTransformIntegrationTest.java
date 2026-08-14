@@ -6,6 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Modifier;
+import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Map;
@@ -97,7 +98,7 @@ class SourceTransformIntegrationTest {
                         """);
         assertThat(command.resultEntries(GAME_JAR)).contains("example/Example.class");
         try (var loader = new URLClassLoader(
-                new java.net.URL[]{command.resultPath(GAME_JAR_NO_RECOMP).toUri().toURL()}
+                new URL[]{command.resultPath(GAME_JAR_NO_RECOMP).toUri().toURL()}
         )) {
             var exampleClass = loader.loadClass("example.Example");
             assertThat(Modifier.isPublic(exampleClass.getDeclaredField("regularField").getModifiers())).isTrue();

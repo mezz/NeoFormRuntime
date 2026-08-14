@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.lang.reflect.Modifier;
+import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 
@@ -86,7 +87,7 @@ class NeoForgeIntegrationTest {
                 .contains("example/Game.class", "neoforge-marker.txt")
                 .doesNotContain("example/Game.java");
         try (var loader = new URLClassLoader(
-                new java.net.URL[]{command.resultPath(GAME_JAR_NO_RECOMP_WITH_NEOFORGE).toUri().toURL()}
+                new URL[]{command.resultPath(GAME_JAR_NO_RECOMP_WITH_NEOFORGE).toUri().toURL()}
         )) {
             var gameClass = loader.loadClass("example.Game");
             assertThat(Modifier.isPublic(gameClass.getDeclaredField("neoForgeTransformed").getModifiers())).isTrue();
