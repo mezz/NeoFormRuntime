@@ -34,13 +34,11 @@ final class LegacyMappings {
     private static final class ClassMapping {
         private final String officialName;
         private final String obfuscatedName;
-        private final String intermediaryName;
         private final List<FieldMapping> fields = new ArrayList<>();
 
-        private ClassMapping(String officialName, String obfuscatedName, String intermediaryName) {
+        private ClassMapping(String officialName, String obfuscatedName) {
             this.officialName = officialName;
             this.obfuscatedName = obfuscatedName;
-            this.intermediaryName = intermediaryName;
         }
 
         private void addField(FieldMapping field) {
@@ -60,7 +58,7 @@ final class LegacyMappings {
         private void appendIntermediaryTo(StringBuilder result) {
             result.append(obfuscatedName)
                     .append(' ')
-                    .append(intermediaryName)
+                    .append(officialName)
                     .append('\n');
             for (var field : fields) {
                 field.appendIntermediaryTo(result);
@@ -98,12 +96,13 @@ final class LegacyMappings {
         private Builder() {
         }
 
-        Builder classMapping(String officialName, String obfuscatedName, String intermediaryName) {
-            currentClass = new ClassMapping(
-                    Objects.requireNonNull(officialName),
-                    Objects.requireNonNull(obfuscatedName),
-                    Objects.requireNonNull(intermediaryName)
-            );
+        Builder classMapping(String officialName, String obfuscatedName) {
+            officialName = Objects.requireNonNull(officialName);
+            obfuscatedName = Objects.requireNonNull(obfuscatedName);
+            if (officialName.equals(obfuscatedName)) {
+                throw new IllegalArgumentException("Obfuscated class names must differ from official class names");
+            }
+            currentClass = new ClassMapping(officialName, obfuscatedName);
             classes.add(currentClass);
             return this;
         }
@@ -115,13 +114,27 @@ final class LegacyMappings {
             if (currentClass == null) {
                 throw new IllegalStateException("A class mapping must be added before its fields");
             }
+            officialName = Objects.requireNonNull(officialName);
+            obfuscatedName = Objects.requireNonNull(obfuscatedName);
+            intermediaryName = Objects.requireNonNull(intermediaryName);
+            requireDistinctNames(officialName, obfuscatedName, intermediaryName);
             currentClass.addField(new FieldMapping(
                     Objects.requireNonNull(type),
-                    Objects.requireNonNull(officialName),
-                    Objects.requireNonNull(obfuscatedName),
-                    Objects.requireNonNull(intermediaryName)
+                    officialName,
+                    obfuscatedName,
+                    intermediaryName
             ));
             return this;
+        }
+
+        private static void requireDistinctNames(String officialName,
+                                                 String obfuscatedName,
+                                                 String intermediaryName) {
+            if (Objects.equals(officialName, obfuscatedName)
+                    || Objects.equals(officialName, intermediaryName)
+                    || Objects.equals(obfuscatedName, intermediaryName)) {
+                throw new IllegalArgumentException("Field mapping names must be distinct");
+            }
         }
 
         LegacyMappings build() {

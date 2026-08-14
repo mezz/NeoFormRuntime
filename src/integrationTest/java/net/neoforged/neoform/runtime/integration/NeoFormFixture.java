@@ -19,17 +19,20 @@ final class NeoFormFixture implements NfrtFixture {
     private final int javaVersion;
     private final Map<String, byte[]> sources;
     private final boolean compileLauncherSources;
+    private final Map<String, byte[]> launcherSources;
     private final LegacyMappings legacyMappings;
 
     private NeoFormFixture(String minecraftVersion,
                            int javaVersion,
                            Map<String, byte[]> sources,
                            boolean compileLauncherSources,
+                           Map<String, byte[]> launcherSources,
                            LegacyMappings legacyMappings) {
         this.minecraftVersion = minecraftVersion;
         this.javaVersion = javaVersion;
         this.sources = Map.copyOf(sources);
         this.compileLauncherSources = compileLauncherSources;
+        this.launcherSources = Map.copyOf(launcherSources);
         this.legacyMappings = legacyMappings;
     }
 
@@ -49,7 +52,11 @@ final class NeoFormFixture implements NfrtFixture {
         NfrtFixtureSupport.writeZip(sourcesArchive, sources);
 
         var clientArtifact = compileLauncherSources
-                ? NfrtFixtureSupport.compileSources(testDirectory, sources, javaVersion)
+                ? NfrtFixtureSupport.compileSources(
+                        testDirectory,
+                        launcherSources.isEmpty() ? sources : launcherSources,
+                        javaVersion
+                )
                 : sourcesArchive;
         var downloads = new LinkedHashMap<String, Path>();
         downloads.put("client", clientArtifact);
@@ -144,6 +151,7 @@ final class NeoFormFixture implements NfrtFixture {
 
     static final class Builder {
         private final Map<String, byte[]> sources = new LinkedHashMap<>();
+        private final Map<String, byte[]> launcherSources = new LinkedHashMap<>();
         private String minecraftVersion = "1.21";
         private int javaVersion = 21;
         private boolean compileLauncherSources;
@@ -179,6 +187,19 @@ final class NeoFormFixture implements NfrtFixture {
             return this;
         }
 
+        /**
+         * Adds a source used only to compile the launcher client artifact, independently of the decompiled sources.
+         */
+        Builder launcherSource(String path, String content) {
+            return launcherSource(path, content.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Builder launcherSource(String path, byte[] content) {
+            launcherSources.put(path, content.clone());
+            compileLauncherSources = true;
+            return this;
+        }
+
         Builder legacyMappings(LegacyMappings legacyMappings) {
             this.legacyMappings = Objects.requireNonNull(legacyMappings);
             return this;
@@ -188,7 +209,14 @@ final class NeoFormFixture implements NfrtFixture {
             if (sources.isEmpty()) {
                 throw new IllegalStateException("At least one source must be added");
             }
-            return new NeoFormFixture(minecraftVersion, javaVersion, sources, compileLauncherSources, legacyMappings);
+            return new NeoFormFixture(
+                    minecraftVersion,
+                    javaVersion,
+                    sources,
+                    compileLauncherSources,
+                    launcherSources,
+                    legacyMappings
+            );
         }
     }
 }

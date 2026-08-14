@@ -150,13 +150,17 @@ class NeoForgeIntegrationTest {
                         class Example {
                         }
                         """)
-                .compileLauncherSources()
+                .launcherSource("a.java", """
+                        @Deprecated
+                        class a {
+                        }
+                        """)
                 .legacyMappings(LegacyMappings.builder()
-                        .classMapping("Example", "Example", "Example")
+                        .classMapping("Example", "a")
                         .build())
                 .build();
         var fixture = NeoForgeFixture.builder(neoForm)
-                .sideAnnotationStripper("Example\n")
+                .sideAnnotationStripper("a\n")
                 .patch("Example.java.patch", """
                         --- a/Example.java
                         +++ b/Example.java

@@ -198,7 +198,7 @@ class SourceTransformIntegrationTest {
                         }
                         """)
                 .legacyMappings(LegacyMappings.builder()
-                        .classMapping("Example", "a", "Example")
+                        .classMapping("Example", "a")
                         .fieldMapping("int", "officialField", "b", "f_1_")
                         .build())
                 .build();
