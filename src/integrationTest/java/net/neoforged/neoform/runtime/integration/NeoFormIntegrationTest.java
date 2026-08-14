@@ -12,6 +12,7 @@ import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_JAR;
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_JAR_NO_RECOMP;
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_JAR_WITH_SOURCES;
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_SOURCES;
+import static net.neoforged.neoform.runtime.integration.ClassFileAssertions.assertTargetsJava;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NeoFormIntegrationTest {
@@ -68,7 +69,7 @@ class NeoFormIntegrationTest {
 
         assertThat(command.resultEntries(GAME_JAR))
                 .containsExactlyInAnyOrder("example/Example.class", "data.txt");
-        command.assertResultClassJavaVersion(GAME_JAR, "example/Example.class", 17);
+        assertTargetsJava(command.readResultBytes(GAME_JAR, "example/Example.class"), 17);
         assertThat(command.readResult(GAME_JAR, "data.txt")).isEqualTo("resource");
     }
 }

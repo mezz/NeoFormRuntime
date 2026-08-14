@@ -22,9 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
 final class NfrtCommand {
-    /** Java 1 used class-file major version 45, with each subsequent Java release incrementing it by one. */
-    private static final int CLASS_FILE_MAJOR_VERSION_OFFSET = 44;
-
     private final List<String> command;
     private final Path workingDirectory;
     private final Path testDirectory;
@@ -81,27 +78,6 @@ final class NfrtCommand {
                 return stream.readAllBytes();
             }
         }
-    }
-
-    /**
-     * Asserts that a class in a result targets the requested Java release, such as Java 17.
-     */
-    void assertResultClassJavaVersion(String resultId, String entryName, int expectedJavaVersion) throws IOException {
-        var classFile = readResultBytes(resultId, entryName);
-        assertThat(classFile)
-                .as("Class file %s in result %s", entryName, resultId)
-                .hasSizeGreaterThanOrEqualTo(8);
-        var actualJavaVersion = classFileMajorVersion(classFile) - CLASS_FILE_MAJOR_VERSION_OFFSET;
-        assertThat(actualJavaVersion)
-                .as("Java version of %s in result %s", entryName, resultId)
-                .isEqualTo(expectedJavaVersion);
-    }
-
-    /**
-     * Reads the unsigned, big-endian {@code major_version} field from a class-file header.
-     */
-    private static int classFileMajorVersion(byte[] classFile) {
-        return (Byte.toUnsignedInt(classFile[6]) << 8) | Byte.toUnsignedInt(classFile[7]);
     }
 
     private Result execute() throws IOException, InterruptedException {
