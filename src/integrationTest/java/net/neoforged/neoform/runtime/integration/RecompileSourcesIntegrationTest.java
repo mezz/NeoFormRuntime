@@ -12,11 +12,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecompileSourcesIntegrationTest {
     @ParameterizedTest(name = "use Eclipse compiler: {0}")
     @ValueSource(booleans = {false, true})
-    void recompilesJavaSourcesAndPreservesResources(boolean useEclipseCompiler,
-                                                    @TempDir Path tempDir) throws Exception {
+    void recompilesJavaSourcesAtConfiguredVersionAndPreservesResources(boolean useEclipseCompiler,
+                                                                       @TempDir Path tempDir) throws Exception {
         var fixture = NeoFormFixture.builder()
                 .source("example/Example.java", "package example; public class Example {}")
                 .source("data.txt", "resource")
+                .javaVersion(17)
                 .build();
         var builder = NfrtCommand.builder(tempDir, fixture)
                 .result(GAME_JAR);
@@ -29,6 +30,12 @@ class RecompileSourcesIntegrationTest {
 
         assertThat(command.resultEntries(GAME_JAR))
                 .containsExactlyInAnyOrder("example/Example.class", "data.txt");
+        var exampleClass = command.readResultBytes(GAME_JAR, "example/Example.class");
+        assertThat(classFileMajorVersion(exampleClass)).isEqualTo(61);
         assertThat(command.readResult(GAME_JAR, "data.txt")).isEqualTo("resource");
+    }
+
+    private static int classFileMajorVersion(byte[] classFile) {
+        return (Byte.toUnsignedInt(classFile[6]) << 8) | Byte.toUnsignedInt(classFile[7]);
     }
 }

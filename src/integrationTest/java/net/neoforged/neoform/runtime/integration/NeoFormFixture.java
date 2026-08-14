@@ -10,17 +10,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Creates a minimal NeoForm archive and launcher metadata for tests of the base Minecraft processing pipeline.
+ * Unlike {@link NeoForgeFixture}, it represents a direct {@code --neoform} input without NeoForge userdev data.
+ */
 final class NeoFormFixture implements NfrtFixture {
     private final String minecraftVersion;
+    private final int javaVersion;
     private final Map<String, byte[]> sources;
     private final boolean compileLauncherSources;
     private final LegacyMappings legacyMappings;
 
     private NeoFormFixture(String minecraftVersion,
+                           int javaVersion,
                            Map<String, byte[]> sources,
                            boolean compileLauncherSources,
                            LegacyMappings legacyMappings) {
         this.minecraftVersion = minecraftVersion;
+        this.javaVersion = javaVersion;
         this.sources = Map.copyOf(sources);
         this.compileLauncherSources = compileLauncherSources;
         this.legacyMappings = legacyMappings;
@@ -80,7 +87,12 @@ final class NeoFormFixture implements NfrtFixture {
                 "input", "{stripClientOutput}",
                 "fixtureInput", "{fixtureSources}"
         ));
-        steps.add(Map.of("type", "copySources", "name", "patch", "input", "{decompileOutput}"));
+        var patchInput = "{decompileOutput}";
+        if (legacyMappings != null) {
+            steps.add(Map.of("type", "inject", "input", patchInput));
+            patchInput = "{injectOutput}";
+        }
+        steps.add(Map.of("type", "copySources", "name", "patch", "input", patchInput));
 
         var copyArguments = List.of(
                 "--in-format", "ARCHIVE",
@@ -91,9 +103,14 @@ final class NeoFormFixture implements NfrtFixture {
         config.put("spec", 1);
         config.put("version", minecraftVersion);
         config.put("official", true);
-        config.put("java_target", 21);
+        config.put("java_target", javaVersion);
         config.put("encoding", "UTF-8");
-        config.put("data", Map.of("fixtureSources", "sources.zip"));
+        var data = new LinkedHashMap<String, Object>();
+        data.put("fixtureSources", "sources.zip");
+        if (legacyMappings != null) {
+            data.put("inject", "inject/");
+        }
+        config.put("data", data);
         config.put("steps", Map.of("joined", steps));
         config.put("functions", Map.of(
                 "copyFixtureSources", Map.of(
@@ -115,6 +132,9 @@ final class NeoFormFixture implements NfrtFixture {
         var entries = new LinkedHashMap<String, byte[]>();
         entries.put("config.json", NfrtFixtureSupport.jsonBytes(config));
         entries.put("sources.zip", Files.readAllBytes(sourcesArchive));
+        if (legacyMappings != null) {
+            entries.put("inject/", new byte[0]);
+        }
         NfrtFixtureSupport.writeZip(neoForm, entries);
         return neoForm;
     }
@@ -125,6 +145,7 @@ final class NeoFormFixture implements NfrtFixture {
     static final class Builder {
         private final Map<String, byte[]> sources = new LinkedHashMap<>();
         private String minecraftVersion = "1.21";
+        private int javaVersion = 21;
         private boolean compileLauncherSources;
         private LegacyMappings legacyMappings;
 
@@ -145,6 +166,14 @@ final class NeoFormFixture implements NfrtFixture {
             return this;
         }
 
+        Builder javaVersion(int javaVersion) {
+            if (javaVersion <= 0) {
+                throw new IllegalArgumentException("Java version must be positive");
+            }
+            this.javaVersion = javaVersion;
+            return this;
+        }
+
         Builder compileLauncherSources() {
             compileLauncherSources = true;
             return this;
@@ -159,7 +188,7 @@ final class NeoFormFixture implements NfrtFixture {
             if (sources.isEmpty()) {
                 throw new IllegalStateException("At least one source must be added");
             }
-            return new NeoFormFixture(minecraftVersion, sources, compileLauncherSources, legacyMappings);
+            return new NeoFormFixture(minecraftVersion, javaVersion, sources, compileLauncherSources, legacyMappings);
         }
     }
 }

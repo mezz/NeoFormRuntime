@@ -265,6 +265,7 @@ final class NfrtCommand {
             addTool(artifacts, "java-source-transformer");
             addTool(artifacts, "diff-patch");
             addTool(artifacts, "installer-tools");
+            addTool(artifacts, "side-annotation-stripper");
             try (var output = Files.newOutputStream(artifactManifest)) {
                 artifacts.store(output, null);
             }
