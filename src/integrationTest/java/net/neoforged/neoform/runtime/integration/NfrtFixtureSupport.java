@@ -51,7 +51,7 @@ final class NfrtFixtureSupport {
         return launcherDirectory;
     }
 
-    static Path compileSources(Path testDirectory, Map<String, byte[]> sources) throws IOException {
+    static Path compileSources(Path testDirectory, Map<String, byte[]> sources, int javaVersion) throws IOException {
         var sourceDirectory = testDirectory.resolve("launcher-sources");
         var classesDirectory = testDirectory.resolve("launcher-classes");
         Files.createDirectories(sourceDirectory);
@@ -74,7 +74,7 @@ final class NfrtFixtureSupport {
         }
         var output = new ByteArrayOutputStream();
         var compilerArguments = new ArrayList<>(List.of(
-                "--release", "21",
+                "--release", Integer.toString(javaVersion),
                 "-proc:none",
                 "-d", classesDirectory.toString()
         ));

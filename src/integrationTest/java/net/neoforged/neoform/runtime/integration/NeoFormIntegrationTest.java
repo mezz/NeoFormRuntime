@@ -57,9 +57,11 @@ class NeoFormIntegrationTest {
                 .source("example/Example.java", "package example; public class Example {}")
                 .source("data.txt", "resource")
                 .javaVersion(17)
+                .compileLauncherSources()
                 .build();
         var builder = NfrtCommand.builder(tempDir, fixture)
-                .result(GAME_JAR);
+                .result(GAME_JAR)
+                .result(GAME_JAR_NO_RECOMP);
         if (useEclipseCompiler) {
             builder.argument("--use-eclipse-compiler");
         }
@@ -70,6 +72,7 @@ class NeoFormIntegrationTest {
         assertThat(command.resultEntries(GAME_JAR))
                 .containsExactlyInAnyOrder("example/Example.class", "data.txt");
         assertTargetsJava(command.readResultBytes(GAME_JAR, "example/Example.class"), 17);
+        assertTargetsJava(command.readResultBytes(GAME_JAR_NO_RECOMP, "example/Example.class"), 17);
         assertThat(command.readResult(GAME_JAR, "data.txt")).isEqualTo("resource");
     }
 }

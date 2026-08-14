@@ -49,7 +49,7 @@ final class NeoFormFixture implements NfrtFixture {
         NfrtFixtureSupport.writeZip(sourcesArchive, sources);
 
         var clientArtifact = compileLauncherSources
-                ? NfrtFixtureSupport.compileSources(testDirectory, sources)
+                ? NfrtFixtureSupport.compileSources(testDirectory, sources, javaVersion)
                 : sourcesArchive;
         var downloads = new LinkedHashMap<String, Path>();
         downloads.put("client", clientArtifact);
