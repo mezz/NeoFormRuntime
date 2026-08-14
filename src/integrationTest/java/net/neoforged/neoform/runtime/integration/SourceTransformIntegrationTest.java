@@ -121,7 +121,13 @@ class SourceTransformIntegrationTest {
                         }
                         """)
                 .build();
-        var command = NfrtCommand.builder(tempDir, fixture)
+        var untransformedCommand = NfrtCommand.builder(tempDir.resolve("untransformed"), fixture)
+                .result(GAME_JAR)
+                .build();
+        assertThat(untransformedCommand.executeExpectingFailure())
+                .contains("value has private access in Example");
+
+        var command = NfrtCommand.builder(tempDir.resolve("transformed"), fixture)
                 .accessTransformer("public Example value\n")
                 .result(GAME_SOURCES)
                 .result(GAME_JAR)

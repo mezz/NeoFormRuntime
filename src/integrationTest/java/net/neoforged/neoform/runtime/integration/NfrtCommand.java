@@ -50,6 +50,12 @@ final class NfrtCommand {
         return result.output();
     }
 
+    String executeExpectingFailure() throws IOException, InterruptedException {
+        var result = execute();
+        result.assertFailure();
+        return result.output();
+    }
+
     Path resultPath(String resultId) {
         var result = results.get(resultId);
         if (result == null) {
@@ -105,6 +111,10 @@ final class NfrtCommand {
     private record Result(int exitCode, String output) {
         void assertSuccess() {
             assertThat(exitCode).as("NFRT output:%n%s", output).isZero();
+        }
+
+        void assertFailure() {
+            assertThat(exitCode).as("NFRT output:%n%s", output).isNotZero();
         }
     }
 
