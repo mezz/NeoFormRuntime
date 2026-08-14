@@ -7,13 +7,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Modifier;
 import java.net.URLClassLoader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
 
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_JAR;
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_JAR_NO_RECOMP;
 import static net.neoforged.neoform.runtime.cli.ResultIds.GAME_SOURCES;
+import static net.neoforged.neoform.runtime.integration.ClassFileAssertions.assertImplementsInterface;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SourceTransformIntegrationTest {
@@ -178,10 +178,14 @@ class SourceTransformIntegrationTest {
         assertThat(command.resultEntries(GAME_JAR))
                 .contains("example/Target.class")
                 .doesNotContain("injected/MissingInterface.class");
-        assertThat(new String(
+        assertImplementsInterface(
+                command.readResultBytes(GAME_JAR, "example/Target.class"),
+                "injected/MissingInterface"
+        );
+        assertImplementsInterface(
                 command.readResultBytes(GAME_JAR_NO_RECOMP, "example/Target.class"),
-                StandardCharsets.ISO_8859_1
-        )).contains("injected/MissingInterface");
+                "injected/MissingInterface"
+        );
     }
 
     @Test

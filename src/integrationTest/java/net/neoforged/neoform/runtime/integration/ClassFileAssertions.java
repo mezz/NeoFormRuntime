@@ -1,37 +1,51 @@
 package net.neoforged.neoform.runtime.integration;
 
+import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
+import org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader;
+import org.eclipse.jdt.internal.compiler.classfmt.ClassFormatException;
+
+import java.io.IOException;
+import java.util.Arrays;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 final class ClassFileAssertions {
-    /**
-     * Java 1 used class-file major version 45, with each subsequent Java release incrementing it by one.
-     *
-     * @see <a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.1">JVMS §4.1</a>
-     */
-    private static final int CLASS_FILE_MAJOR_VERSION_OFFSET = 44;
-
     private ClassFileAssertions() {
     }
 
     /**
      * Asserts that a class file targets the requested Java release, such as Java 17.
+     *
+     * @see <a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.1">JVMS §4.1</a>
      */
     static void assertTargetsJava(byte[] classFile, int expectedJavaVersion) {
-        assertThat(classFile)
-                .as("Class file")
-                .hasSizeGreaterThanOrEqualTo(8);
-        var actualJavaVersion = classFileMajorVersion(classFile) - CLASS_FILE_MAJOR_VERSION_OFFSET;
+        var majorVersion = (int) (readClassFile(classFile).getVersion() >>> 16);
+        var actualJavaVersion = majorVersion - ClassFileConstants.MAJOR_VERSION_0;
         assertThat(actualJavaVersion)
                 .as("Java version targeted by class file")
                 .isEqualTo(expectedJavaVersion);
     }
 
     /**
-     * Reads the unsigned, big-endian {@code major_version} field from a class-file header.
+     * Asserts that a class file directly implements the interface with the given JVM internal name.
      *
      * @see <a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.1">JVMS §4.1</a>
      */
-    private static int classFileMajorVersion(byte[] classFile) {
-        return (Byte.toUnsignedInt(classFile[6]) << 8) | Byte.toUnsignedInt(classFile[7]);
+    static void assertImplementsInterface(byte[] classFile, String expectedInterface) {
+        var parsedClassFile = readClassFile(classFile);
+        var interfaces = Arrays.stream(parsedClassFile.getInterfaceNames())
+                .map(String::new)
+                .toList();
+        assertThat(interfaces)
+                .as("Interfaces directly implemented by %s", new String(parsedClassFile.getName()))
+                .contains(expectedInterface);
+    }
+
+    private static ClassFileReader readClassFile(byte[] classFile) {
+        try {
+            return ClassFileReader.read(classFile, "result.class");
+        } catch (ClassFormatException | IOException e) {
+            throw new AssertionError("Invalid class file", e);
+        }
     }
 }
