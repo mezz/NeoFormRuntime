@@ -68,12 +68,7 @@ class NeoFormIntegrationTest {
 
         assertThat(command.resultEntries(GAME_JAR))
                 .containsExactlyInAnyOrder("example/Example.class", "data.txt");
-        var exampleClass = command.readResultBytes(GAME_JAR, "example/Example.class");
-        assertThat(classFileMajorVersion(exampleClass)).isEqualTo(61);
+        command.assertResultClassJavaVersion(GAME_JAR, "example/Example.class", 17);
         assertThat(command.readResult(GAME_JAR, "data.txt")).isEqualTo("resource");
-    }
-
-    private static int classFileMajorVersion(byte[] classFile) {
-        return (Byte.toUnsignedInt(classFile[6]) << 8) | Byte.toUnsignedInt(classFile[7]);
     }
 }
