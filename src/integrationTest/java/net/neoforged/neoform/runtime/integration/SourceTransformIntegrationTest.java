@@ -46,6 +46,8 @@ class SourceTransformIntegrationTest {
                         validatedAtPath,
                         "public Example validatedField\n"
                 )
+                .result(GAME_SOURCES)
+                .result(GAME_JAR)
                 .build();
 
         command.executeSuccessfully();
@@ -57,6 +59,7 @@ class SourceTransformIntegrationTest {
                             public int validatedField;
                         }
                         """);
+        assertThat(command.resultEntries(GAME_JAR)).contains("Example.class");
     }
 
     @Test
@@ -68,12 +71,18 @@ class SourceTransformIntegrationTest {
                         public class Example {
                             private int regularField;
                             private int validatedField;
+
+                            static class Nested {
+                            }
                         }
                         """)
                 .compileLauncherSources()
                 .build();
         var command = NfrtCommand.builder(tempDir, fixture)
-                .accessTransformer("public example.Example regularField\n")
+                .accessTransformer("""
+                        public example.Example regularField
+                        public example.Example$Nested
+                        """)
                 .validatedAccessTransformer("public example.Example validatedField\n")
                 .parchmentData(ParchmentData.builder()
                         .classJavadoc("example/Example", "Documented by Parchment")
@@ -94,9 +103,17 @@ class SourceTransformIntegrationTest {
                         public class Example {
                             public int regularField;
                             public int validatedField;
+
+                            public static class Nested {
+                                Nested() {}
+                            }
                         }
                         """);
-        assertThat(command.resultEntries(GAME_JAR)).contains("example/Example.class");
+        assertThat(command.resultEntries(GAME_JAR))
+                .contains(
+                        "example/Example.class",
+                        "example/Example$Nested.class"
+                );
         try (var loader = new URLClassLoader(
                 new URL[]{command.resultPath(GAME_JAR_NO_RECOMP).toUri().toURL()}
         )) {
@@ -144,6 +161,45 @@ class SourceTransformIntegrationTest {
                         """);
         assertThat(command.resultEntries(GAME_JAR))
                 .contains("Example.class", "Consumer.class");
+    }
+
+    @Test
+    void recompilesConsumersOfTransformedCompileTimeConstants(@TempDir Path tempDir) throws Exception {
+        var fixture = NeoFormFixture.builder()
+                .source("example/Constants.java", """
+                        package example;
+
+                        public class Constants {
+                            public static final int VALUE = 1;
+                        }
+
+                        class Secondary {
+                        }
+                        """)
+                .source("example/Consumer.java", """
+                        package example;
+
+                        public class Consumer {
+                            public static int value() {
+                                return Constants.VALUE;
+                            }
+                        }
+                        """)
+                .build();
+        var command = NfrtCommand.builder(tempDir, fixture)
+                .validatedAccessTransformer("public-f example.Constants VALUE\n")
+                .result(GAME_JAR)
+                .build();
+
+        command.executeSuccessfully();
+
+        assertThat(command.resultEntries(GAME_JAR))
+                .contains("example/Constants.class", "example/Secondary.class", "example/Consumer.class");
+        try (var loader = new URLClassLoader(new URL[]{command.resultPath(GAME_JAR).toUri().toURL()})) {
+            var constants = loader.loadClass("example.Constants");
+            constants.getField("VALUE").setInt(null, 7);
+            assertThat(loader.loadClass("example.Consumer").getMethod("value").invoke(null)).isEqualTo(7);
+        }
     }
 
     @Test
