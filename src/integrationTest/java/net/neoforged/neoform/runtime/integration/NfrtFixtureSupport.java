@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 final class NfrtFixtureSupport {
@@ -28,7 +29,8 @@ final class NfrtFixtureSupport {
 
     static Path createLauncherDirectory(Path testDirectory,
                                         String minecraftVersion,
-                                        Map<String, Path> downloads) throws IOException {
+                                        Map<String, Path> downloads,
+                                        Map<String, Path> libraries) throws IOException {
         var launcherDirectory = testDirectory.resolve("launcher");
         var versionDirectory = launcherDirectory.resolve("versions").resolve(minecraftVersion);
         Files.createDirectories(versionDirectory);
@@ -46,9 +48,29 @@ final class NfrtFixtureSupport {
         var manifest = new LinkedHashMap<String, Object>();
         manifest.put("id", minecraftVersion);
         manifest.put("downloads", downloadEntries);
-        manifest.put("libraries", List.of());
+        var libraryEntries = new ArrayList<Map<String, Object>>();
+        for (var entry : libraries.entrySet()) {
+            var artifact = entry.getValue();
+            var download = new LinkedHashMap<String, Object>();
+            download.put("sha1", sha1(artifact));
+            download.put("size", Files.size(artifact));
+            download.put("url", artifact.toUri().toString());
+            libraryEntries.add(Map.of(
+                    "name", entry.getKey(),
+                    "downloads", Map.of("artifact", download)
+            ));
+        }
+        manifest.put("libraries", libraryEntries);
         Files.writeString(versionDirectory.resolve(minecraftVersion + ".json"), toJson(manifest));
         return launcherDirectory;
+    }
+
+    static Path compileSource(Path testDirectory, String sourcePath, String source, int javaVersion) throws IOException {
+        return compileSources(
+                testDirectory,
+                Map.of(sourcePath, source.getBytes(StandardCharsets.UTF_8)),
+                javaVersion
+        );
     }
 
     static Path compileSources(Path testDirectory, Map<String, byte[]> sources, int javaVersion) throws IOException {
@@ -107,6 +129,18 @@ final class NfrtFixtureSupport {
             byteEntries.put(entry.getKey(), entry.getValue().getBytes(StandardCharsets.UTF_8));
         }
         writeZip(output, byteEntries);
+    }
+
+    static byte[] readZipEntry(Path input, String entryName) throws IOException {
+        try (var zip = new ZipFile(input.toFile())) {
+            var entry = zip.getEntry(entryName);
+            if (entry == null) {
+                throw new IOException("Entry " + entryName + " not found in " + input);
+            }
+            try (var stream = zip.getInputStream(entry)) {
+                return stream.readAllBytes();
+            }
+        }
     }
 
     static void writeZip(Path output, Map<String, byte[]> entries) throws IOException {

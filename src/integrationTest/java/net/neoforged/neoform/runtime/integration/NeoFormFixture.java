@@ -20,6 +20,8 @@ final class NeoFormFixture implements NfrtFixture {
     private final Map<String, byte[]> sources;
     private final boolean compileLauncherSources;
     private final Map<String, byte[]> launcherSources;
+    private final Map<String, Path> minecraftLibraries;
+    private final List<String> neoFormLibraries;
     private final LegacyMappings legacyMappings;
 
     private NeoFormFixture(String minecraftVersion,
@@ -27,12 +29,16 @@ final class NeoFormFixture implements NfrtFixture {
                            Map<String, byte[]> sources,
                            boolean compileLauncherSources,
                            Map<String, byte[]> launcherSources,
+                           Map<String, Path> minecraftLibraries,
+                           List<String> neoFormLibraries,
                            LegacyMappings legacyMappings) {
         this.minecraftVersion = minecraftVersion;
         this.javaVersion = javaVersion;
         this.sources = Map.copyOf(sources);
         this.compileLauncherSources = compileLauncherSources;
         this.launcherSources = Map.copyOf(launcherSources);
+        this.minecraftLibraries = Map.copyOf(minecraftLibraries);
+        this.neoFormLibraries = List.copyOf(neoFormLibraries);
         this.legacyMappings = legacyMappings;
     }
 
@@ -73,7 +79,8 @@ final class NeoFormFixture implements NfrtFixture {
         var launcherDirectory = NfrtFixtureSupport.createLauncherDirectory(
                 testDirectory,
                 minecraftVersion,
-                downloads
+                downloads,
+                minecraftLibraries
         );
         var neoFormArchive = createNeoFormArchive(context, sourcesArchive);
         return new NeoFormMaterialized(launcherDirectory, neoFormArchive);
@@ -125,6 +132,7 @@ final class NeoFormFixture implements NfrtFixture {
                         "args", List.of(
                                 "--in-format", "ARCHIVE",
                                 "--out-format", "ARCHIVE",
+                                "--libraries-list", "{listLibrariesOutput}",
                                 "{fixtureInput}", "{output}"
                         )
                 ),
@@ -133,7 +141,7 @@ final class NeoFormFixture implements NfrtFixture {
                         "args", copyArguments
                 )
         ));
-        config.put("libraries", Map.of("joined", List.of()));
+        config.put("libraries", Map.of("joined", neoFormLibraries));
 
         var neoForm = context.testDirectory().resolve("neoform.zip");
         var entries = new LinkedHashMap<String, byte[]>();
@@ -152,6 +160,8 @@ final class NeoFormFixture implements NfrtFixture {
     static final class Builder {
         private final Map<String, byte[]> sources = new LinkedHashMap<>();
         private final Map<String, byte[]> launcherSources = new LinkedHashMap<>();
+        private final Map<String, Path> minecraftLibraries = new LinkedHashMap<>();
+        private final List<String> neoFormLibraries = new ArrayList<>();
         private String minecraftVersion = "1.21";
         private int javaVersion = 21;
         private boolean compileLauncherSources;
@@ -200,6 +210,16 @@ final class NeoFormFixture implements NfrtFixture {
             return this;
         }
 
+        Builder minecraftLibrary(String coordinate, Path artifact) {
+            minecraftLibraries.put(Objects.requireNonNull(coordinate), Objects.requireNonNull(artifact));
+            return this;
+        }
+
+        Builder neoFormLibrary(String coordinate) {
+            neoFormLibraries.add(Objects.requireNonNull(coordinate));
+            return this;
+        }
+
         Builder legacyMappings(LegacyMappings legacyMappings) {
             this.legacyMappings = Objects.requireNonNull(legacyMappings);
             return this;
@@ -215,6 +235,8 @@ final class NeoFormFixture implements NfrtFixture {
                     sources,
                     compileLauncherSources,
                     launcherSources,
+                    minecraftLibraries,
+                    neoFormLibraries,
                     legacyMappings
             );
         }

@@ -188,4 +188,71 @@ class NeoForgeIntegrationTest {
                         }
                         """);
     }
+
+    @Test
+    void addsNeoForgeLibrariesAndUniversalJarToTheCompileClasspath(@TempDir Path tempDir) throws Exception {
+        var neoForgeLibrary = NfrtFixtureSupport.compileSource(
+                tempDir.resolve("neoforge-library"),
+                "neoforge/library/LibraryDependency.java",
+                """
+                        package neoforge.library;
+
+                        public class LibraryDependency {
+                        }
+                        """,
+                21
+        );
+        var universalJar = NfrtFixtureSupport.compileSource(
+                tempDir.resolve("neoforge-universal"),
+                "neoforge/universal/UniversalDependency.java",
+                """
+                        package neoforge.universal;
+
+                        public class UniversalDependency {
+                        }
+                        """,
+                21
+        );
+        var neoForm = NeoFormFixture.builder()
+                .source("example/UsesNeoForgeClasspath.java", """
+                        package example;
+
+                        import neoforge.library.LibraryDependency;
+                        import neoforge.universal.UniversalDependency;
+
+                        public class UsesNeoForgeClasspath {
+                            private LibraryDependency libraryDependency;
+                            private UniversalDependency universalDependency;
+                        }
+                        """)
+                .build();
+        var fixture = NeoForgeFixture.builder(neoForm)
+                .library("fixture:neoforge-library:1")
+                .universalEntry(
+                        "neoforge/universal/UniversalDependency.class",
+                        NfrtFixtureSupport.readZipEntry(
+                                universalJar,
+                                "neoforge/universal/UniversalDependency.class"
+                        )
+                )
+                .patch("example/UsesNeoForgeClasspath.java.patch", """
+                        --- a/example/UsesNeoForgeClasspath.java
+                        +++ b/example/UsesNeoForgeClasspath.java
+                        @@ -6,4 +6,4 @@
+                         public class UsesNeoForgeClasspath {
+                        -    private LibraryDependency libraryDependency;
+                        +    public LibraryDependency libraryDependency;
+                             private UniversalDependency universalDependency;
+                         }
+                        """)
+                .build();
+        var command = NfrtCommand.builder(tempDir, fixture)
+                .artifact("fixture:neoforge-library:1", neoForgeLibrary)
+                .result(GAME_JAR)
+                .build();
+
+        command.executeSuccessfully();
+
+        assertThat(command.resultEntries(GAME_JAR)).contains("example/UsesNeoForgeClasspath.class");
+    }
 }

@@ -124,6 +124,7 @@ final class NfrtCommand {
         private final List<InputFile> accessTransformers = new ArrayList<>();
         private final List<InputFile> validatedAccessTransformers = new ArrayList<>();
         private final List<String> arguments = new ArrayList<>();
+        private final Map<String, Path> artifacts = new LinkedHashMap<>();
         private final Set<String> requestedResults = new LinkedHashSet<>();
         private Duration timeout = Duration.ofMinutes(2);
         private InputFile interfaceInjectionData;
@@ -178,6 +179,11 @@ final class NfrtCommand {
             return this;
         }
 
+        Builder artifact(String coordinate, Path artifact) {
+            artifacts.put(Objects.requireNonNull(coordinate), Objects.requireNonNull(artifact));
+            return this;
+        }
+
         Builder enableCache() {
             cacheEnabled = true;
             return this;
@@ -208,7 +214,7 @@ final class NfrtCommand {
                     testDirectory,
                     javaSourceTransformerCoordinate
             ));
-            var artifactManifest = createArtifactManifest(testDirectory);
+            var artifactManifest = createArtifactManifest(testDirectory, artifacts);
 
             var regularAtPaths = writeInputFiles(testDirectory, workingDirectory, accessTransformers);
             var validatedAtPaths = writeInputFiles(testDirectory, workingDirectory, validatedAccessTransformers);
@@ -269,13 +275,17 @@ final class NfrtCommand {
             );
         }
 
-        private static Path createArtifactManifest(Path testDirectory) throws IOException {
+        private static Path createArtifactManifest(Path testDirectory,
+                                                   Map<String, Path> additionalArtifacts) throws IOException {
             var artifactManifest = testDirectory.resolve("artifact-manifest.properties");
             var artifacts = new Properties();
             addTool(artifacts, "java-source-transformer");
             addTool(artifacts, "diff-patch");
             addTool(artifacts, "installer-tools");
             addTool(artifacts, "side-annotation-stripper");
+            additionalArtifacts.forEach((coordinate, artifact) ->
+                    artifacts.setProperty(coordinate, artifact.toAbsolutePath().toString())
+            );
             try (var output = Files.newOutputStream(artifactManifest)) {
                 artifacts.store(output, null);
             }

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static net.neoforged.neoform.runtime.cli.ResultIds.CLIENT_RESOURCES;
@@ -74,5 +75,119 @@ class NeoFormIntegrationTest {
         assertTargetsJava(command.readResultBytes(GAME_JAR, "example/Example.class"), 17);
         assertTargetsJava(command.readResultBytes(GAME_JAR_NO_RECOMP, "example/Example.class"), 17);
         assertThat(command.readResult(GAME_JAR, "data.txt")).isEqualTo("resource");
+    }
+
+    @Test
+    void usesMinecraftAndNeoFormLibrariesForSourceTransformsAndRecompilation(@TempDir Path tempDir) throws Exception {
+        var minecraftLibrary = NfrtFixtureSupport.compileSource(
+                tempDir.resolve("minecraft-library"),
+                "fixture/minecraft/MinecraftDependency.java",
+                """
+                        package fixture.minecraft;
+
+                        public class MinecraftDependency {
+                        }
+                        """,
+                21
+        );
+        var neoFormLibrary = NfrtFixtureSupport.compileSource(
+                tempDir.resolve("neoform-library"),
+                "fixture/neoform/NeoFormDependency.java",
+                """
+                        package fixture.neoform;
+
+                        public class NeoFormDependency {
+                        }
+                        """,
+                21
+        );
+        var fixture = NeoFormFixture.builder()
+                .source("example/UsesConfiguredLibraries.java", """
+                        package example;
+
+                        import fixture.minecraft.MinecraftDependency;
+                        import fixture.neoform.NeoFormDependency;
+
+                        public class UsesConfiguredLibraries {
+                            private MinecraftDependency minecraftDependency;
+                            private NeoFormDependency neoFormDependency;
+                        }
+                        """)
+                .minecraftLibrary("fixture:minecraft-dependency:1", minecraftLibrary)
+                .neoFormLibrary("fixture:neoform-dependency:1")
+                .build();
+        var command = NfrtCommand.builder(tempDir, fixture)
+                .artifact("fixture:neoform-dependency:1", neoFormLibrary)
+                .validatedAccessTransformer("public example.UsesConfiguredLibraries minecraftDependency\n")
+                .result(GAME_SOURCES)
+                .result(GAME_JAR)
+                .build();
+
+        command.executeSuccessfully();
+
+        assertThat(command.readResult(GAME_SOURCES, "example/UsesConfiguredLibraries.java"))
+                .isEqualTo("""
+                        package example;
+
+                        import fixture.minecraft.MinecraftDependency;
+                        import fixture.neoform.NeoFormDependency;
+
+                        public class UsesConfiguredLibraries {
+                            public MinecraftDependency minecraftDependency;
+                            private NeoFormDependency neoFormDependency;
+                        }
+                        """);
+        assertThat(command.resultEntries(GAME_JAR)).contains("example/UsesConfiguredLibraries.class");
+    }
+
+    @Test
+    void compileClasspathOverrideReplacesConfiguredLibrariesEverywhere(@TempDir Path tempDir) throws Exception {
+        var minecraftLibrary = NfrtFixtureSupport.compileSource(
+                tempDir.resolve("minecraft-library"),
+                "fixture/defaults/MinecraftDependency.java",
+                """
+                        package fixture.defaults;
+
+                        public class MinecraftDependency {
+                        }
+                        """,
+                21
+        );
+        var overrideLibrary = NfrtFixtureSupport.compileSource(
+                tempDir.resolve("override-library"),
+                "fixture/override/OverrideDependency.java",
+                """
+                        package fixture.override;
+
+                        public class OverrideDependency {
+                        }
+                        """,
+                21
+        );
+        var fixture = NeoFormFixture.builder()
+                .source("example/UsesOverride.java", """
+                        package example;
+
+                        import fixture.override.OverrideDependency;
+
+                        public class UsesOverride {
+                            private OverrideDependency dependency;
+                        }
+                        """)
+                .minecraftLibrary("fixture:minecraft-dependency:1", minecraftLibrary)
+                .neoFormLibrary("fixture:missing-neoform-dependency:1")
+                .build();
+        var command = NfrtCommand.builder(tempDir, fixture)
+                .argument("--compile-classpath=" + overrideLibrary.toAbsolutePath())
+                .validatedAccessTransformer("public example.UsesOverride dependency\n")
+                .result(GAME_JAR)
+                .build();
+
+        // The launcher manifest has already captured this artifact. Removing it proves that the override
+        // replaces the Minecraft and NeoForm defaults instead of merely being appended to them.
+        Files.delete(minecraftLibrary);
+        command.executeSuccessfully();
+
+        assertThat(command.resultEntries(GAME_JAR)).contains("example/UsesOverride.class");
     }
 }

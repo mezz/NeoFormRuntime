@@ -3,6 +3,7 @@ package net.neoforged.neoform.runtime.integration;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ final class NeoForgeFixture implements NfrtFixture {
     private final NeoFormFixture neoForm;
     private final Map<String, String> sources;
     private final Map<String, byte[]> universalEntries;
+    private final List<String> libraries;
     private final Map<String, String> accessTransformers;
     private final byte[] binaryPatch;
     private final Map<String, String> patches;
@@ -26,6 +28,7 @@ final class NeoForgeFixture implements NfrtFixture {
     private NeoForgeFixture(NeoFormFixture neoForm,
                             Map<String, String> sources,
                             Map<String, byte[]> universalEntries,
+                            List<String> libraries,
                             Map<String, String> accessTransformers,
                             byte[] binaryPatch,
                             Map<String, String> patches,
@@ -35,6 +38,7 @@ final class NeoForgeFixture implements NfrtFixture {
         this.neoForm = neoForm;
         this.sources = Map.copyOf(sources);
         this.universalEntries = Map.copyOf(universalEntries);
+        this.libraries = List.copyOf(libraries);
         this.accessTransformers = Map.copyOf(accessTransformers);
         this.binaryPatch = binaryPatch.clone();
         this.patches = Map.copyOf(patches);
@@ -80,7 +84,7 @@ final class NeoForgeFixture implements NfrtFixture {
         config.put("patchesOriginalPrefix", patchesOriginalPrefix);
         config.put("patchesModifiedPrefix", patchesModifiedPrefix);
         config.put("runs", Map.of());
-        config.put("libraries", List.of());
+        config.put("libraries", libraries);
         config.put("modules", List.of());
         config.put("sass", List.copyOf(sideAnnotationStrippers.keySet()));
 
@@ -110,6 +114,7 @@ final class NeoForgeFixture implements NfrtFixture {
         private final NeoFormFixture neoForm;
         private final Map<String, String> sources = new LinkedHashMap<>();
         private final Map<String, byte[]> universalEntries = new LinkedHashMap<>();
+        private final List<String> libraries = new ArrayList<>();
         private final Map<String, String> accessTransformers = new LinkedHashMap<>();
         private byte[] binaryPatch = new byte[0];
         private final Map<String, String> patches = new LinkedHashMap<>();
@@ -132,6 +137,11 @@ final class NeoForgeFixture implements NfrtFixture {
 
         Builder universalEntry(String path, byte[] content) {
             universalEntries.put(path, content.clone());
+            return this;
+        }
+
+        Builder library(String coordinate) {
+            libraries.add(Objects.requireNonNull(coordinate));
             return this;
         }
 
@@ -168,6 +178,7 @@ final class NeoForgeFixture implements NfrtFixture {
                     neoForm,
                     sources,
                     universalEntries,
+                    libraries,
                     accessTransformers,
                     binaryPatch,
                     patches,
