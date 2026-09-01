@@ -172,10 +172,9 @@ artifacts {
 
 test {
     useJUnitPlatform()
-    dependsOn "integrationTest"
 }
 
-tasks.register("integrationTest", Test) {
+final integrationTest = tasks.register("integrationTest", Test) {
     description = "Runs tests against the packaged NFRT command line"
     group = "verification"
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
@@ -204,6 +203,9 @@ tasks.register("integrationTest", Test) {
         systemProperty "nfrt.test.side-annotation-stripper-coordinate", toolVersions.getProperty("MCF_SIDE_ANNOTATION_STRIPPER")
         systemProperty "nfrt.test.side-annotation-stripper-jar", configurations.integrationTestSideAnnotationStripper.singleFile.absolutePath
     }
+}
+tasks.named("check") {
+    dependsOn integrationTest
 }
 
 publishing {

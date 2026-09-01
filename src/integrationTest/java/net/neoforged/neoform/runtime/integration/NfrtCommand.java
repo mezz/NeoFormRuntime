@@ -73,7 +73,11 @@ final class NfrtCommand {
     }
 
     String readResult(String resultId, String entryName) throws IOException {
-        return new String(readResultBytes(resultId, entryName), StandardCharsets.UTF_8);
+        return new String(readResultBytes(resultId, entryName), StandardCharsets.UTF_8)
+                // When running tests on Windows,
+                // reading from the file system will give CRLF endings,
+                // but the string literals for the expected result have LF endings
+                .replace(System.lineSeparator(), "\n");
     }
 
     byte[] readResultBytes(String resultId, String entryName) throws IOException {
